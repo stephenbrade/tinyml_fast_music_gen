@@ -50,7 +50,6 @@ def eval_music(test_loader, model, device):
     with torch.no_grad():
         for batch in tqdm(test_loader, desc = 'Evaluating accuracy...'):
             input_ids, labels = batch['input_ids'].to(device), batch['labels'].to(device)
-            input_ids[input_ids == -1] = VOCAB_SIZE
             logits = model(input_ids)
             sum_acc += float(compute_epiano_accuracy(logits, labels))
         avg_acc = sum_acc / total_eval
@@ -82,9 +81,9 @@ def guidance_music(args, exp_name, repr_sim, student_model, target_model = 'musi
 
     # VOCAB_SIZE = 88
     if student_model == 'Music-LSTM':
-        model = MusicLSTM(VOCAB_SIZE + 1, embedding_dim, hidden_dim, num_layers, fc_dim, device)
+        model = MusicLSTM(92, embedding_dim, hidden_dim, num_layers, fc_dim, device)
     elif student_model == 'Music-Trans':
-        model = MusicTransformer(VOCAB_SIZE + 1, n_layers=3, num_heads=12,
+        model = MusicTransformer(92, n_layers=3, num_heads=12,
                     d_model=768, dim_feedforward=2048, dropout=0.1,
                     max_sequence=1024, rpr=True)
     else:
@@ -93,7 +92,7 @@ def guidance_music(args, exp_name, repr_sim, student_model, target_model = 'musi
 
     optimizer = optim.AdamW(model.parameters(), lr = lr)
     lr_stepper = LrStepTracker(hidden_dim)
-    # lr_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_stepper.step)
+    lr_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_stepper.step)
     val_losses = []
     epoch_train_losses = []
     step_train_losses = []
@@ -104,7 +103,7 @@ def guidance_music(args, exp_name, repr_sim, student_model, target_model = 'musi
 
     if repr_sim:
         if target_model == 'music-trans':
-            target_model = MusicTransformer(VOCAB_SIZE + 1, n_layers=3, num_heads=12,
+            target_model = MusicTransformer(92, n_layers=3, num_heads=12,
                         d_model=768, dim_feedforward=2048, dropout=0.1,
                         max_sequence=1024, rpr=True)
             if pretrained:
@@ -117,7 +116,6 @@ def guidance_music(args, exp_name, repr_sim, student_model, target_model = 'musi
         # hidden = None
         for i, batch in enumerate(tqdm(valid_dataloader, desc = 'Iterating over valid loader...')):
             input_ids, labels = batch['input_ids'].to(device), batch['labels'].to(device)
-            input_ids[input_ids == -1] = VOCAB_SIZE
             with torch.no_grad():
                 logits = model(input_ids)
             logits = logits.view(-1, logits.size(-1))
@@ -160,7 +158,7 @@ def guidance_music(args, exp_name, repr_sim, student_model, target_model = 'musi
             if (i + 1) % accumulation == 0:
                 optimizer.step()
                 optimizer.zero_grad()
-                # lr_scheduler.step()
+                lr_scheduler.step()
             if ce_loss == None:
                 train_loss += loss.item()
             else:

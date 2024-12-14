@@ -46,6 +46,30 @@ def process_midi(raw_mid, max_seq, random_seq):
         tgt = data[1:full_seq]
     return x, tgt
 
+def process_jsb(raw_jsb, max_seq, random_seq = True):
+    x = torch.full((max_seq, ), 90, dtype = torch.long)
+    tgt = torch.full((max_seq, ), 90, dtype = torch.long)
+    raw_len = len(raw_jsb)
+    full_seq = max_seq + 1
+
+    if(raw_len < full_seq):
+        x[:raw_len] = raw_jsb
+        tgt[:raw_len-1] = raw_jsb[1:]
+        tgt[raw_len-1]  = 91
+    else:
+        if(random_seq):
+            end_range = raw_len - full_seq
+            start = random.randint(0, end_range)
+        else:
+            start = 0
+        end = start + full_seq
+        data = raw_jsb[start:end]
+        x = data[:max_seq]
+        tgt = data[1:full_seq]
+    x[x == -1] = 89
+    tgt[tgt == -1] = 89
+    return x, tgt
+
 class EPianoDataset(data.Dataset):
     def __init__(self, root, max_seq = 1024, random_seq = True):
         self.root = root
@@ -127,6 +151,9 @@ def jsb_refactor_json(file_in, file_out):
 
     return new_dataset 
 
+def make_note_mapping(new_dataset):
+    print(new_dataset)
+
 class JSBChoralesDataset(data.Dataset):
     def __init__(self, data_split, max_seq = 1024, random_seq = True):
         self.data_split = data_split
@@ -138,8 +165,7 @@ class JSBChoralesDataset(data.Dataset):
     
     def __getitem__(self, idx):
         output_mid = torch.tensor(self.data_split[idx])
-        # output_mid = torch.tensor(midi_processor.encode_midi(output_mid))
-        x, tgt = process_midi(output_mid, self.max_seq, self.random_seq)
+        x, tgt = process_jsb(output_mid, self.max_seq, self.random_seq)
         return {'input_ids': x, 'labels': tgt}
 
 def jsb_chorales_dataloaders(json_file_path, max_seq = 1024, random_seq = True, batch_size = 64, num_workers = 16):
@@ -157,7 +183,12 @@ if __name__ == '__main__':
     json_file_path = 'music-gen/JSB-Chorales-dataset/Jsb16thSeparated.json'
     new_dataset = jsb_refactor_json(json_file_path, 'music-gen/JSB-Chorales-dataset/Jsb16thSeparated_refactored.json')
 
-    print(len(new_dataset['train'][5]))
-    _, val_loader, _ = create_epiano_dataloaders('music-gen/chunked-maestro-v2.0.0/', 1024, 64, 16)
-    for batch in val_loader:
-        batch
+    train_dataset = new_dataset['valid']
+    flat_list = [num for sublist in train_dataset for num in sublist]
+    unique_numbers = set(flat_list)
+    print(unique_numbers)
+    count_unique = len(unique_numbers)
+    print(count_unique)
+
+    lengths = {len(sublist) for sublist in new_dataset['train']}
+    print(lengths)
