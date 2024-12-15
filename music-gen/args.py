@@ -4,6 +4,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp_name', action = 'store', type = str, required = True, dest = 'exp_name')
     parser.add_argument('--seed', action = 'store', type = int, dest = 'seed', default = 0)
+    parser.add_argument('--task', action = 'store', type = str, dest = 'task', required = True, choices = ['maestro', 'jsb'])
     
     parser.add_argument('--eval', action = 'store_true', dest = 'eval')
     parser.add_argument('--target_model', action = 'store', type = str, dest = 'target_model', default = 'lstm', choices = ['music-trans'])

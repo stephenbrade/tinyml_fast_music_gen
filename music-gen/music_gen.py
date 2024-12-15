@@ -55,7 +55,7 @@ def eval_music(test_loader, model, device):
         avg_acc = sum_acc / total_eval
     return avg_acc
 
-def guidance_music(args, exp_name, repr_sim, student_model, target_model = 'music-trans', pretrained = True, num_epochs = 10, 
+def guidance_music(args, exp_name, task, repr_sim, student_model, target_model = 'music-trans', pretrained = True, num_epochs = 10, 
              batch_size = 64, num_workers = 16, lr = 1e-3, accumulation = 1, embedding_dim = 768, hidden_dim = 768, num_layers = 3, fc_dim = 512,
              rep_dist = None, rep_sim_alpha = 1.0):
     wandb.init(
@@ -74,16 +74,19 @@ def guidance_music(args, exp_name, repr_sim, student_model, target_model = 'musi
         }
     )
 
-    # train_dataloader, valid_dataloader, test_dataloader = create_epiano_dataloaders('music-gen/chunked-maestro-v2.0.0/', 1024, batch_size, num_workers)
-    train_dataloader, valid_dataloader, test_dataloader = jsb_chorales_dataloaders('music-gen/JSB-Chorales-dataset/Jsb16thSeparated.json', 1024, True, batch_size, num_workers)
+    if task == 'maestro':
+        train_dataloader, valid_dataloader, test_dataloader = create_epiano_dataloaders('music-gen/chunked-maestro-v2.0.0/', 1024, batch_size, num_workers)
+        vocab_size = VOCAB_SIZE
+    else:
+        train_dataloader, valid_dataloader, test_dataloader = jsb_chorales_dataloaders('music-gen/JSB-Chorales-dataset/Jsb16thSeparated.json', 1024, True, batch_size, num_workers)
+        vocab_size = 92
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     loss_fn = nn.CrossEntropyLoss(ignore_index = -1)
 
-    # VOCAB_SIZE = 88
     if student_model == 'Music-LSTM':
-        model = MusicLSTM(92, embedding_dim, hidden_dim, num_layers, fc_dim, device)
+        model = MusicLSTM(vocab_size, embedding_dim, hidden_dim, num_layers, fc_dim, device)
     elif student_model == 'Music-Trans':
-        model = MusicTransformer(92, n_layers=3, num_heads=12,
+        model = MusicTransformer(vocab_size, n_layers=3, num_heads=12,
                     d_model=768, dim_feedforward=2048, dropout=0.1,
                     max_sequence=1024, rpr=True)
     else:
@@ -103,7 +106,7 @@ def guidance_music(args, exp_name, repr_sim, student_model, target_model = 'musi
 
     if repr_sim:
         if target_model == 'music-trans':
-            target_model = MusicTransformer(92, n_layers=3, num_heads=12,
+            target_model = MusicTransformer(vocab_size, n_layers=3, num_heads=12,
                         d_model=768, dim_feedforward=2048, dropout=0.1,
                         max_sequence=1024, rpr=True)
             if pretrained:
@@ -194,7 +197,7 @@ if __name__ == '__main__':
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     if not args.eval:
-        model, epoch_train_losses, step_train_losses, val_losses, step_ce_loss, step_rep_sim_loss = guidance_music(args, args.exp_name, args.rep_sim, 
+        model, epoch_train_losses, step_train_losses, val_losses, step_ce_loss, step_rep_sim_loss = guidance_music(args, args.exp_name, args.task, args.rep_sim, 
                                                                                                                 args.student_model, args.target_model, args.pretrained, args.num_epochs, 
                                                                                                                 args.batch_size, args.num_workers, args.lr, args.accumulation, args.embedding_dim, args.hidden_dim, args.num_layers, 
                                                                                                                 args.fc_dim, args.rep_dist, args.rep_sim_alpha)
